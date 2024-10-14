@@ -13,11 +13,11 @@ pub trait MetamorphicTest {
         (mutation.mutate_input(input), mutation.should_be_equal())
     }
 
-    fn call(&self, input: &Self::Input) -> Self::Output;
+    fn call(input: &Self::Input) -> Self::Output;
 
-    fn test(&self, reference_input: &Self::Input, reference_output: &Self::Output, mutation: &Self::InputMutation) -> bool {
+    fn test(reference_input: &Self::Input, reference_output: &Self::Output, mutation: &Self::InputMutation) -> bool {
         let (new_input, should_be_equal) = Self::maul(reference_input, mutation);
-        let new_output = self.call(&new_input);
+        let new_output = Self::call(&new_input);
         Self::output_check(reference_output, &new_output, should_be_equal).is_ok()
     }
 }
