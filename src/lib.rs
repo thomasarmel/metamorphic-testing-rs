@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 pub mod hash_metamorphic;
 
 pub trait MetamorphicTest {
@@ -38,4 +40,4 @@ pub trait Mutation<Input> : Iterator<Item = Input> {
     }
 }
 
-pub trait PrimitiveInput : Clone {}
+pub trait PrimitiveInput : Clone + Debug {}

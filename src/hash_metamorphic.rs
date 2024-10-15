@@ -1,7 +1,7 @@
 use sha3::{Digest, Sha3_256};
 use crate::{MetamorphicTest, Mutation, PrimitiveInput};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HashInput {
     input: Vec<u8>
 }
