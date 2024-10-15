@@ -1,6 +1,7 @@
 use sha3::{Digest, Sha3_256};
 use crate::{MetamorphicTest, Mutation, PrimitiveInput};
 
+#[derive(Clone)]
 pub struct HashInput {
     input: Vec<u8>
 }
@@ -39,6 +40,10 @@ impl Mutation<HashInput> for SingleBitMutation {
     const OUTPUT_SHOULD_BE_EQ: bool = false;
 
     fn mutate_input(&self, input: &HashInput) -> HashInput {
-        todo!()
+        let unsigned_pos = self.bit_to_mutate_index >> 3;
+        let bit_pos = self.bit_to_mutate_index & 7;
+        let mut output = input.clone();
+        output.input[unsigned_pos] ^= 1 << bit_pos;
+        output
     }
 }

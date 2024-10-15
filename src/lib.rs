@@ -31,4 +31,4 @@ pub trait Mutation<Input> {
     }
 }
 
-pub trait PrimitiveInput {}
+pub trait PrimitiveInput : Clone {}
