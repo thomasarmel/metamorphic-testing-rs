@@ -22,7 +22,7 @@ pub struct Sha2BitContributionMetamorphicTest {}
 impl MetamorphicTest for Sha2BitContributionMetamorphicTest {
     type Input = HashInput;
     type Output = Vec<u8>;
-    type InputMutation = SingleBitMutation;
+    type InputMutation = HashSingleBitMutation;
 
     fn call(input: &Self::Input) -> Self::Output {
         let mut hasher = sha2::Sha256::new();
@@ -41,7 +41,7 @@ pub struct Sha3BitContributionMetamorphicTest {}
 impl MetamorphicTest for Sha3BitContributionMetamorphicTest {
     type Input = HashInput;
     type Output = Vec<u8>;
-    type InputMutation = SingleBitMutation;
+    type InputMutation = HashSingleBitMutation;
 
     fn call(input: &Self::Input) -> Self::Output {
         let mut hasher = sha3::Sha3_256::new();
@@ -55,12 +55,12 @@ impl MetamorphicTest for Sha3BitContributionMetamorphicTest {
     }
 }
 
-pub struct SingleBitMutation {
+pub struct HashSingleBitMutation {
     bit_to_mutate_index: usize,
     original_input: HashInput,
 }
 
-impl SingleBitMutation {
+impl HashSingleBitMutation {
     pub fn new(original_input: &HashInput) -> Self {
         Self {
             bit_to_mutate_index: 0,
@@ -84,7 +84,7 @@ impl SingleBitMutation {
     }
 }
 
-impl Mutation<HashInput> for SingleBitMutation {
+impl Mutation<HashInput> for HashSingleBitMutation {
     const OUTPUT_SHOULD_BE_EQ: bool = false;
 
     fn clone_with_new_original_input(&self, new_original_input: &HashInput) -> Self {
@@ -95,7 +95,7 @@ impl Mutation<HashInput> for SingleBitMutation {
     }
 }
 
-impl Iterator for SingleBitMutation {
+impl Iterator for HashSingleBitMutation {
     type Item = HashInput;
 
     fn next(&mut self) -> Option<Self::Item> {
