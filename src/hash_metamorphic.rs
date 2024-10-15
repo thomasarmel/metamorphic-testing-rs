@@ -1,5 +1,6 @@
 use sha3::{Digest, Sha3_256};
 use crate::{MetamorphicTest, Mutation, PrimitiveInput};
+use rand::{distributions::Uniform, Rng};
 
 #[derive(Clone, Debug)]
 pub struct HashInput {
@@ -38,6 +39,10 @@ impl MetamorphicTest for Sha3BitContributionMetamorphicTest {
         let hash: Vec<u8> = hasher.finalize().to_vec();
         hash
     }
+
+    fn get_interesting_input_iterator() -> Box<dyn Iterator<Item=Self::Input>> {
+        Box::new(InterestingInputIterator::new())
+    }
 }
 
 pub struct SingleBitMutation {
@@ -71,6 +76,13 @@ impl SingleBitMutation {
 
 impl Mutation<HashInput> for SingleBitMutation {
     const OUTPUT_SHOULD_BE_EQ: bool = false;
+
+    fn clone_with_new_original_input(&self, new_original_input: &HashInput) -> Self {
+        Self {
+            bit_to_mutate_index: 0,
+            original_input: new_original_input.clone()
+        }
+    }
 }
 
 impl Iterator for SingleBitMutation {
@@ -80,5 +92,33 @@ impl Iterator for SingleBitMutation {
         let res = self.mutate_input(&self.original_input);
         self.incr();
         res
+    }
+}
+
+struct InterestingInputIterator{
+    input_size: usize
+}
+
+impl InterestingInputIterator {
+    fn new() -> Self {
+        Self {
+            input_size: 1
+        }
+    }
+}
+
+impl Iterator for InterestingInputIterator {
+    type Item = HashInput;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.input_size > 1024 {
+            return None
+        }
+        let range = Uniform::from(0..=255);
+        let values: Vec<u8> = rand::thread_rng().sample_iter(&range).take(self.input_size).collect();
+        self.input_size += 1;
+        Some(HashInput {
+            input: values
+        })
     }
 }
