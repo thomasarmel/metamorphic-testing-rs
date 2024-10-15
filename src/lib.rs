@@ -9,16 +9,25 @@ pub trait MetamorphicTest {
 
     fn output_check(output: &Self::Output, reference_output: &Self::Output, should_be_equal: bool) -> Result<(), ()>;
 
-    fn maul(mutation: &mut Self::InputMutation) -> (Self::Input, bool) { // should_be_equal
-        (mutation.next().unwrap(), mutation.should_be_equal())
+    fn maul(mutation: &mut Self::InputMutation) -> Option<(Self::Input, bool)> { // should_be_equal
+        Some((mutation.next()?, mutation.should_be_equal()))
     }
 
     fn call(input: &Self::Input) -> Self::Output;
 
-    fn test(reference_output: &Self::Output, mutation: &mut Self::InputMutation) -> bool {
-        let (new_input, should_be_equal) = Self::maul(mutation);
+    fn test(reference_output: &Self::Output, mutation: &mut Self::InputMutation) -> Option<bool> {
+        let (new_input, should_be_equal) = Self::maul(mutation)?;
         let new_output = Self::call(&new_input);
-        Self::output_check(reference_output, &new_output, should_be_equal).is_ok()
+        Some(Self::output_check(reference_output, &new_output, should_be_equal).is_ok())
+    }
+
+    fn test_all(reference_output: &Self::Output, mutation: &mut Self::InputMutation) -> bool {
+        while let Some(res) = Self::test(reference_output, mutation) {
+            if !res {
+                return false;
+            }
+        }
+        true
     }
 }
 
