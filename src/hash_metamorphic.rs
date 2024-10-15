@@ -1,6 +1,6 @@
-use sha3::{Digest, Sha3_256};
 use crate::{MetamorphicTest, Mutation, PrimitiveInput};
 use rand::{distributions::Uniform, Rng};
+use sha3::Digest;
 
 #[derive(Clone, Debug)]
 pub struct HashInput {
@@ -17,6 +17,27 @@ impl HashInput {
 
 impl PrimitiveInput for HashInput {}
 
+pub struct Sha2BitContributionMetamorphicTest {
+
+}
+
+impl MetamorphicTest for Sha2BitContributionMetamorphicTest {
+    type Input = HashInput;
+    type Output = Vec<u8>;
+    type InputMutation = SingleBitMutation;
+
+    fn call(input: &Self::Input) -> Self::Output {
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(&input.input);
+        let hash: Vec<u8> = hasher.finalize().to_vec();
+        hash
+    }
+
+    fn get_interesting_input_iterator() -> Box<dyn Iterator<Item=Self::Input>> {
+        Box::new(InterestingHashInputIterator::new())
+    }
+}
+
 pub struct Sha3BitContributionMetamorphicTest {
 
 }
@@ -26,22 +47,15 @@ impl MetamorphicTest for Sha3BitContributionMetamorphicTest {
     type Output = Vec<u8>;
     type InputMutation = SingleBitMutation;
 
-    fn output_check(output: &Self::Output, reference_output: &Self::Output, should_be_equal: bool) -> Result<(), ()> {
-        if (output == reference_output) == should_be_equal {
-            return Ok(());
-        }
-        Err(())
-    }
-
     fn call(input: &Self::Input) -> Self::Output {
-        let mut hasher = Sha3_256::new();
+        let mut hasher = sha3::Sha3_256::new();
         hasher.update(&input.input);
         let hash: Vec<u8> = hasher.finalize().to_vec();
         hash
     }
 
     fn get_interesting_input_iterator() -> Box<dyn Iterator<Item=Self::Input>> {
-        Box::new(InterestingInputIterator::new())
+        Box::new(InterestingHashInputIterator::new())
     }
 }
 
@@ -95,11 +109,11 @@ impl Iterator for SingleBitMutation {
     }
 }
 
-struct InterestingInputIterator{
+struct InterestingHashInputIterator {
     input_size: usize
 }
 
-impl InterestingInputIterator {
+impl InterestingHashInputIterator {
     fn new() -> Self {
         Self {
             input_size: 1
@@ -107,7 +121,7 @@ impl InterestingInputIterator {
     }
 }
 
-impl Iterator for InterestingInputIterator {
+impl Iterator for InterestingHashInputIterator {
     type Item = HashInput;
 
     fn next(&mut self) -> Option<Self::Item> {

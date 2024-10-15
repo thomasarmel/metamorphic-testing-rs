@@ -9,7 +9,12 @@ pub trait MetamorphicTest {
 
     type InputMutation: Mutation<Self::Input>;
 
-    fn output_check(output: &Self::Output, reference_output: &Self::Output, should_be_equal: bool) -> Result<(), ()>;
+    fn output_check(output: &Self::Output, reference_output: &Self::Output, should_be_equal: bool) -> Result<(), ()>{
+        if (output == reference_output) == should_be_equal {
+            return Ok(());
+        }
+        Err(())
+    }
 
     fn maul(mutation: &mut Self::InputMutation) -> Option<(Self::Input, bool)> { // should_be_equal
         Some((mutation.next()?, mutation.should_be_equal()))
