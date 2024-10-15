@@ -9,14 +9,19 @@ pub trait MetamorphicTest {
 
     type InputMutation: Mutation<Self::Input>;
 
-    fn output_check(output: &Self::Output, reference_output: &Self::Output, should_be_equal: bool) -> Result<(), ()>{
+    fn output_check(
+        output: &Self::Output,
+        reference_output: &Self::Output,
+        should_be_equal: bool,
+    ) -> Result<(), ()> {
         if (output == reference_output) == should_be_equal {
             return Ok(());
         }
         Err(())
     }
 
-    fn maul(mutation: &mut Self::InputMutation) -> Option<(Self::Input, bool)> { // should_be_equal
+    fn maul(mutation: &mut Self::InputMutation) -> Option<(Self::Input, bool)> {
+        // should_be_equal
         Some((mutation.next()?, mutation.should_be_equal()))
     }
 
@@ -45,7 +50,7 @@ pub trait MetamorphicTest {
     fn get_interesting_input_iterator() -> Box<dyn Iterator<Item = Self::Input>>;
 }
 
-pub trait Mutation<Input> : Iterator<Item = Input> {
+pub trait Mutation<Input>: Iterator<Item = Input> {
     const OUTPUT_SHOULD_BE_EQ: bool;
     fn should_be_equal(&self) -> bool {
         Self::OUTPUT_SHOULD_BE_EQ
@@ -54,4 +59,4 @@ pub trait Mutation<Input> : Iterator<Item = Input> {
     fn clone_with_new_original_input(&self, new_original_input: &Input) -> Self;
 }
 
-pub trait PrimitiveInput : Clone + Debug {}
+pub trait PrimitiveInput: Clone + Debug {}

@@ -4,22 +4,20 @@ use sha3::Digest;
 
 #[derive(Clone, Debug)]
 pub struct HashInput {
-    input: Vec<u8>
+    input: Vec<u8>,
 }
 
 impl HashInput {
     pub fn new(hash_input: &[u8]) -> Self {
         Self {
-            input: Vec::from(hash_input)
+            input: Vec::from(hash_input),
         }
     }
 }
 
 impl PrimitiveInput for HashInput {}
 
-pub struct Sha2BitContributionMetamorphicTest {
-
-}
+pub struct Sha2BitContributionMetamorphicTest {}
 
 impl MetamorphicTest for Sha2BitContributionMetamorphicTest {
     type Input = HashInput;
@@ -33,14 +31,12 @@ impl MetamorphicTest for Sha2BitContributionMetamorphicTest {
         hash
     }
 
-    fn get_interesting_input_iterator() -> Box<dyn Iterator<Item=Self::Input>> {
+    fn get_interesting_input_iterator() -> Box<dyn Iterator<Item = Self::Input>> {
         Box::new(InterestingHashInputIterator::new())
     }
 }
 
-pub struct Sha3BitContributionMetamorphicTest {
-
-}
+pub struct Sha3BitContributionMetamorphicTest {}
 
 impl MetamorphicTest for Sha3BitContributionMetamorphicTest {
     type Input = HashInput;
@@ -54,27 +50,27 @@ impl MetamorphicTest for Sha3BitContributionMetamorphicTest {
         hash
     }
 
-    fn get_interesting_input_iterator() -> Box<dyn Iterator<Item=Self::Input>> {
+    fn get_interesting_input_iterator() -> Box<dyn Iterator<Item = Self::Input>> {
         Box::new(InterestingHashInputIterator::new())
     }
 }
 
 pub struct SingleBitMutation {
     bit_to_mutate_index: usize,
-    original_input: HashInput
+    original_input: HashInput,
 }
 
 impl SingleBitMutation {
     pub fn new(original_input: &HashInput) -> Self {
         Self {
             bit_to_mutate_index: 0,
-            original_input: original_input.clone()
+            original_input: original_input.clone(),
         }
     }
 
     fn mutate_input(&self, input: &HashInput) -> Option<HashInput> {
         if self.bit_to_mutate_index >= input.input.len() * 8 {
-            return None
+            return None;
         }
         let unsigned_pos = self.bit_to_mutate_index >> 3;
         let bit_pos = self.bit_to_mutate_index & 7;
@@ -94,7 +90,7 @@ impl Mutation<HashInput> for SingleBitMutation {
     fn clone_with_new_original_input(&self, new_original_input: &HashInput) -> Self {
         Self {
             bit_to_mutate_index: 0,
-            original_input: new_original_input.clone()
+            original_input: new_original_input.clone(),
         }
     }
 }
@@ -110,14 +106,12 @@ impl Iterator for SingleBitMutation {
 }
 
 struct InterestingHashInputIterator {
-    input_size: usize
+    input_size: usize,
 }
 
 impl InterestingHashInputIterator {
     fn new() -> Self {
-        Self {
-            input_size: 1
-        }
+        Self { input_size: 1 }
     }
 }
 
@@ -126,13 +120,14 @@ impl Iterator for InterestingHashInputIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.input_size > 1024 {
-            return None
+            return None;
         }
         let range = Uniform::from(0..=255);
-        let values: Vec<u8> = rand::thread_rng().sample_iter(&range).take(self.input_size).collect();
+        let values: Vec<u8> = rand::thread_rng()
+            .sample_iter(&range)
+            .take(self.input_size)
+            .collect();
         self.input_size += 1;
-        Some(HashInput {
-            input: values
-        })
+        Some(HashInput { input: values })
     }
 }
