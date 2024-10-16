@@ -33,6 +33,8 @@ pub struct KyberArgyleCipherBitFlipMetamorphicTest {}
 
 pub struct KyberArgylePkBitFlipMetamorphicTest {}
 
+pub struct KyberArgyleSkBitFlipMetamorphicTest {}
+
 pub struct AllArgyleKyberOutput {
     plain: [u8; 32],
     pk: [u8; KYBER_PUBLICKEYBYTES],
@@ -40,9 +42,20 @@ pub struct AllArgyleKyberOutput {
     cipher: [u8; KYBER_CIPHERTEXTBYTES]
 }
 
+pub struct PlainAndCipherArgyleKyberOutput {
+    plain: [u8; 32],
+    cipher: [u8; KYBER_CIPHERTEXTBYTES]
+}
+
 impl PartialEq for AllArgyleKyberOutput {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, other: &Self) -> bool { // actually we test that all fields are different, this is illogical but this is legacy code '^^
         self.plain == other.plain || self.pk == other.pk || self.sk == other.sk || self.cipher == other.cipher
+    }
+}
+
+impl PartialEq for PlainAndCipherArgyleKyberOutput {
+    fn eq(&self, other: &Self) -> bool { // actually we test that all fields are different, this is illogical but this is legacy code '^^
+        self.plain == other.plain || self.cipher == other.cipher
     }
 }
 
@@ -62,10 +75,31 @@ impl MetamorphicTest for KyberArgyleCipherBitFlipMetamorphicTest {
 
 impl MetamorphicTest for KyberArgylePkBitFlipMetamorphicTest {
     type Input = KyberArgyleInput;
-    type Output = [u8; 32];
+    type Output = PlainAndCipherArgyleKyberOutput;
     type InputMutation = KyberArgylePkSingleBitMutation;
 
     fn call(input: &Self::Input) -> Self::Output {
+        PlainAndCipherArgyleKyberOutput {
+            plain: decapsulate(&input.cipher, &input.sk).unwrap(),
+            cipher: input.cipher,
+        }
+    }
+
+    fn get_interesting_input_iterator() -> Box<dyn Iterator<Item=Self::Input>> {
+        Box::new(InterestingKyberArgyleInputIterator::new())
+    }
+}
+
+impl MetamorphicTest for KyberArgyleSkBitFlipMetamorphicTest {
+    type Input = KyberArgyleInput;
+    type Output = [u8; 32];
+    type InputMutation = KyberArgyleSkSingleBitMutation;
+
+    fn call(input: &Self::Input) -> Self::Output {
+        //if 2130435834 != crc32fast::hash(&decapsulate(&input.cipher, &input.sk).unwrap()) {
+            println!("{} -> {} ({})", crc32fast::hash(&input.sk), crc32fast::hash(&decapsulate(&input.cipher, &input.sk).unwrap()), crc32fast::hash(&input.cipher));
+        //}
+        //println!("{:?}", decapsulate(&input.cipher, &input.sk).unwrap());
         decapsulate(&input.cipher, &input.sk).unwrap()
     }
 
@@ -105,6 +139,11 @@ pub struct KyberArgylePkSingleBitMutation {
     original_input: KyberArgyleInput,
 }
 
+pub struct KyberArgyleSkSingleBitMutation {
+    bit_to_mutate_index: usize,
+    original_input: KyberArgyleInput,
+}
+
 impl Mutation<KyberArgyleInput> for KyberArgyleCipherSingleBitMutation {
     const OUTPUT_SHOULD_BE_EQ: bool = false;
 
@@ -126,6 +165,18 @@ impl Mutation<KyberArgyleInput> for KyberArgylePkSingleBitMutation {
         }
     }
 }
+
+impl Mutation<KyberArgyleInput> for KyberArgyleSkSingleBitMutation {
+    const OUTPUT_SHOULD_BE_EQ: bool = false;
+
+    fn clone_with_new_original_input(&self, new_original_input: &KyberArgyleInput) -> Self {
+        Self {
+            bit_to_mutate_index: 0,
+            original_input: new_original_input.clone(),
+        }
+    }
+}
+
 impl KyberArgyleCipherSingleBitMutation {
     pub fn new(original_input: &KyberArgyleInput) -> Self {
         Self {
@@ -164,7 +215,27 @@ impl KyberArgylePkSingleBitMutation {
         let mut output = input.clone();
         output.pk[unsigned_pos] ^= 1 << bit_pos;
         let (cipher, _) = encapsulate(&output.pk, &mut rng).unwrap();
-        output.cipher = cipher;
+        output.cipher = cipher; // we need to change the cipher too
+        Some(output)
+    }
+}
+
+impl KyberArgyleSkSingleBitMutation {
+    pub fn new(original_input: &KyberArgyleInput) -> Self {
+        Self {
+            bit_to_mutate_index: 0,
+            original_input: original_input.clone(),
+        }
+    }
+
+    fn mutate_input(&self, input: &KyberArgyleInput) -> Option<KyberArgyleInput> {
+        if self.bit_to_mutate_index >= input.sk.len() * 8 {
+            return None;
+        }
+        let unsigned_pos = self.bit_to_mutate_index >> 3;
+        let bit_pos = self.bit_to_mutate_index & 7;
+        let mut output = input.clone();
+        output.sk[unsigned_pos] ^= 1 << bit_pos;
         Some(output)
     }
 }
@@ -180,6 +251,16 @@ impl Iterator for KyberArgyleCipherSingleBitMutation {
 }
 
 impl Iterator for KyberArgylePkSingleBitMutation {
+    type Item = KyberArgyleInput;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let res = self.mutate_input(&self.original_input);
+        self.bit_to_mutate_index += 1;
+        res
+    }
+}
+
+impl Iterator for KyberArgyleSkSingleBitMutation {
     type Item = KyberArgyleInput;
 
     fn next(&mut self) -> Option<Self::Item> {
