@@ -1,49 +1,78 @@
-use sha3::{Digest, Sha3_256};
-use crate::{MetamorphicTest, Mutation, PrimitiveInput};
+use crate::HashMetamorphic;
+use rand;
+use rand::RngCore;
+use sha2::{Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256};
+use sha3::{Digest, Sha3_224, Sha3_256, Sha3_384, Sha3_512};
 
-#[derive(Clone)]
-pub struct HashInput {
-    input: Vec<u8>
-}
+macro_rules! impl_hash_metamorphic {
+    ($hash_type:ty, $test_struct_name:ident, $libname:literal) => {
+        pub struct $test_struct_name {}
+        impl HashMetamorphic for $test_struct_name {
+            type Input = Vec<u8>;
+            type Output = Vec<u8>;
+            type State = $hash_type;
 
-impl PrimitiveInput for HashInput {}
+            const LIBNAME: &str = $libname;
 
-struct Sha3BitContributionMetamorphicTest {
+            fn gen_input(size: usize) -> Self::Input {
+                let mut data = vec![0u8; size];
+                rand::thread_rng().fill_bytes(&mut data);
+                data
+            }
 
-}
+            fn input_as_u8(input: &Self::Input) -> Vec<u8> {
+                input.to_owned()
+            }
 
-impl MetamorphicTest for Sha3BitContributionMetamorphicTest {
-    type Input = HashInput;
-    type Output = Vec<u8>;
-    type InputMutation = SingleBitMutation;
+            fn output_as_u8(output: &Self::Output) -> Vec<u8> {
+                output.to_owned()
+            }
 
-    fn output_check(output: &Self::Output, reference_output: &Self::Output, should_be_equal: bool) -> Result<(), ()> {
-        if (output == reference_output) == should_be_equal {
-            return Ok(());
+            fn compare_output(initial_output: &Self::Output, output: &Self::Output) -> bool {
+                initial_output == output
+            }
+
+            fn hash(state: Self::State, input: &Self::Input) -> Self::Output {
+                let mut hasher = state;
+
+                hasher.update(input);
+
+                hasher.finalize().to_vec()
+            }
+
+            fn initial_state() -> Self::State {
+                Self::State::new()
+            }
+
+            fn u8_as_input(
+                intial_state: &Self::State,
+                _initial_input: &Self::Input,
+                mutated: Vec<u8>,
+            ) -> (Self::State, Self::Input) {
+                (intial_state.clone(), mutated)
+            }
+
+            fn hash_update(
+                initial_state: &Self::State,
+                _initial_input: &Self::Input,
+                first_part: &[u8],
+                second_part: &[u8],
+            ) -> (Self::State, Self::Input) {
+                let mut state = initial_state.clone();
+                state.update(first_part);
+                (state, second_part.to_vec())
+            }
         }
-        Err(())
-    }
-
-    fn call(input: &Self::Input) -> Self::Output {
-        let mut hasher = Sha3_256::new();
-        hasher.update(&input.input);
-        let hash: Vec<u8> = hasher.finalize().to_vec();
-        hash
-    }
+    };
 }
 
-struct SingleBitMutation {
-    bit_to_mutate_index: usize
-}
-
-impl Mutation<HashInput> for SingleBitMutation {
-    const OUTPUT_SHOULD_BE_EQ: bool = false;
-
-    fn mutate_input(&self, input: &HashInput) -> HashInput {
-        let unsigned_pos = self.bit_to_mutate_index >> 3;
-        let bit_pos = self.bit_to_mutate_index & 7;
-        let mut output = input.clone();
-        output.input[unsigned_pos] ^= 1 << bit_pos;
-        output
-    }
-}
+impl_hash_metamorphic! {Sha224, Sha2_224Metamorphic, "Sha2_224"}
+impl_hash_metamorphic! {Sha256, Sha2_256Metamorphic, "Sha2_256"}
+impl_hash_metamorphic! {Sha384, Sha2_384Metamorphic, "Sha2_384"}
+impl_hash_metamorphic! {Sha512, Sha2_512Metamorphic, "Sha2_512"}
+impl_hash_metamorphic! {Sha512_224, Sha2_512_224Metamorphic, "Sha2_512_224"}
+impl_hash_metamorphic! {Sha512_256, Sha2_512_256Metamorphic, "Sha2_512_256"}
+impl_hash_metamorphic! {Sha3_224, Sha3_224Metamorphic, "Sha3_224"}
+impl_hash_metamorphic! {Sha3_256, Sha3_256Metamorphic, "Sha3_256"}
+impl_hash_metamorphic! {Sha3_384, Sha3_384Metamorphic, "Sha3_384"}
+impl_hash_metamorphic! {Sha3_512, Sha3_512Metamorphic, "Sha3_512"}
