@@ -13,3 +13,4 @@ strum_macros = "0.26.4"
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
 pqc_kyber = "0.7.1"
+fake_crypto_rng = {git="https://github.com/thomasarmel/fake_crypto_rng.git"}

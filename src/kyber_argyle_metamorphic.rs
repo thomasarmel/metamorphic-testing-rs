@@ -1,3 +1,4 @@
+use fake_crypto_rng::FakeCryptoRng;
 use pqc_kyber::{decapsulate, encapsulate, keypair, KYBER_CIPHERTEXTBYTES, KYBER_PUBLICKEYBYTES, KYBER_SECRETKEYBYTES};
 use crate::{MetamorphicTest, Mutation, PrimitiveInput};
 
@@ -11,6 +12,7 @@ pub struct KyberArgyleInput {
 impl KyberArgyleInput {
     pub fn new() -> Self {
         let mut rng = rand::thread_rng();
+        //let mut rng = FakeCryptoRng::new(0);
         let keys_bob = keypair(&mut rng).unwrap();
 
         // Alice encapsulates a shared secret using Bob's public key
@@ -33,6 +35,22 @@ impl MetamorphicTest for KyberArgyleCipherBitFlipMetamorphicTest {
     type Input = KyberArgyleInput;
     type Output = [u8; 32];
     type InputMutation = KyberArgyleCipherSingleBitMutation;
+
+    fn call(input: &Self::Input) -> Self::Output {
+        decapsulate(&input.cipher, &input.sk).unwrap()
+    }
+
+    fn get_interesting_input_iterator() -> Box<dyn Iterator<Item=Self::Input>> {
+        Box::new(InterestingKyberArgyleInputIterator::new())
+    }
+}
+
+pub struct KyberArgyleFakeRngMetamorphicTest {}
+
+impl MetamorphicTest for KyberArgyleFakeRngMetamorphicTest {
+    type Input = KyberArgyleInput;
+    type Output = [u8; 32];
+    type InputMutation = KyberArgyleFakeRngBitMutation;
 
     fn call(input: &Self::Input) -> Self::Output {
         decapsulate(&input.cipher, &input.sk).unwrap()
@@ -84,6 +102,59 @@ impl Iterator for KyberArgyleCipherSingleBitMutation {
     fn next(&mut self) -> Option<Self::Item> {
         let res = self.mutate_input(&self.original_input);
         self.bit_to_mutate_index += 1;
+        res
+    }
+}
+
+pub struct KyberArgyleFakeRngBitMutation {
+    original_input: KyberArgyleInput,
+    index: usize
+}
+
+impl Mutation<KyberArgyleInput> for KyberArgyleFakeRngBitMutation {
+    const OUTPUT_SHOULD_BE_EQ: bool = false;
+
+    fn clone_with_new_original_input(&self, new_original_input: &KyberArgyleInput) -> Self {
+        Self {
+            original_input: new_original_input.clone(),
+            index: 1
+        }
+    }
+}
+
+impl KyberArgyleFakeRngBitMutation {
+    pub fn new(original_input: &KyberArgyleInput) -> Self {
+        Self {
+            original_input: original_input.clone(),
+            index: 1
+        }
+    }
+
+    fn mutate_input(&self, _input: &KyberArgyleInput) -> Option<KyberArgyleInput> {
+        if self.index == 0 {
+            return None
+        }
+        let mut rng = FakeCryptoRng::new(1);
+        let keys_bob = keypair(&mut rng).unwrap();
+
+        // Alice encapsulates a shared secret using Bob's public key
+        let (ciphertext, _) = encapsulate(&keys_bob.public, &mut rng).unwrap();
+        //let shared_secret_bob = decapsulate(&ciphertext, &keys_bob.secret).unwrap();
+
+        Some(KyberArgyleInput {
+            sk: keys_bob.secret,
+            pk: keys_bob.public,
+            cipher: ciphertext,
+        })
+    }
+}
+
+impl Iterator for KyberArgyleFakeRngBitMutation {
+    type Item = KyberArgyleInput;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let res = self.mutate_input(&self.original_input);
+        self.index -= 1;
         res
     }
 }
