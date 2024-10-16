@@ -11,8 +11,8 @@ pub struct KyberArgyleInput {
 
 impl KyberArgyleInput {
     pub fn new() -> Self {
-        let mut rng = rand::thread_rng();
-        //let mut rng = FakeCryptoRng::new(0);
+        //let mut rng = rand::thread_rng();
+        let mut rng = FakeCryptoRng::new(0);
         let keys_bob = keypair(&mut rng).unwrap();
 
         // Alice encapsulates a shared secret using Bob's public key
@@ -31,6 +31,8 @@ impl PrimitiveInput for KyberArgyleInput {}
 
 pub struct KyberArgyleCipherBitFlipMetamorphicTest {}
 
+pub struct KyberArgylePkBitFlipMetamorphicTest {}
+
 pub struct AllArgyleKyberOutput {
     plain: [u8; 32],
     pk: [u8; KYBER_PUBLICKEYBYTES],
@@ -48,6 +50,20 @@ impl MetamorphicTest for KyberArgyleCipherBitFlipMetamorphicTest {
     type Input = KyberArgyleInput;
     type Output = [u8; 32];
     type InputMutation = KyberArgyleCipherSingleBitMutation;
+
+    fn call(input: &Self::Input) -> Self::Output {
+        decapsulate(&input.cipher, &input.sk).unwrap()
+    }
+
+    fn get_interesting_input_iterator() -> Box<dyn Iterator<Item=Self::Input>> {
+        Box::new(InterestingKyberArgyleInputIterator::new())
+    }
+}
+
+impl MetamorphicTest for KyberArgylePkBitFlipMetamorphicTest {
+    type Input = KyberArgyleInput;
+    type Output = [u8; 32];
+    type InputMutation = KyberArgylePkSingleBitMutation;
 
     fn call(input: &Self::Input) -> Self::Output {
         decapsulate(&input.cipher, &input.sk).unwrap()
@@ -84,7 +100,23 @@ pub struct KyberArgyleCipherSingleBitMutation {
     original_input: KyberArgyleInput,
 }
 
+pub struct KyberArgylePkSingleBitMutation {
+    bit_to_mutate_index: usize,
+    original_input: KyberArgyleInput,
+}
+
 impl Mutation<KyberArgyleInput> for KyberArgyleCipherSingleBitMutation {
+    const OUTPUT_SHOULD_BE_EQ: bool = false;
+
+    fn clone_with_new_original_input(&self, new_original_input: &KyberArgyleInput) -> Self {
+        Self {
+            bit_to_mutate_index: 0,
+            original_input: new_original_input.clone(),
+        }
+    }
+}
+
+impl Mutation<KyberArgyleInput> for KyberArgylePkSingleBitMutation {
     const OUTPUT_SHOULD_BE_EQ: bool = false;
 
     fn clone_with_new_original_input(&self, new_original_input: &KyberArgyleInput) -> Self {
@@ -114,7 +146,40 @@ impl KyberArgyleCipherSingleBitMutation {
     }
 }
 
+impl KyberArgylePkSingleBitMutation {
+    pub fn new(original_input: &KyberArgyleInput) -> Self {
+        Self {
+            bit_to_mutate_index: 0,
+            original_input: original_input.clone(),
+        }
+    }
+
+    fn mutate_input(&self, input: &KyberArgyleInput) -> Option<KyberArgyleInput> {
+        if self.bit_to_mutate_index >= input.pk.len() * 8 {
+            return None;
+        }
+        let mut rng = FakeCryptoRng::new(0);
+        let unsigned_pos = self.bit_to_mutate_index >> 3;
+        let bit_pos = self.bit_to_mutate_index & 7;
+        let mut output = input.clone();
+        output.pk[unsigned_pos] ^= 1 << bit_pos;
+        let (cipher, _) = encapsulate(&output.pk, &mut rng).unwrap();
+        output.cipher = cipher;
+        Some(output)
+    }
+}
+
 impl Iterator for KyberArgyleCipherSingleBitMutation {
+    type Item = KyberArgyleInput;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let res = self.mutate_input(&self.original_input);
+        self.bit_to_mutate_index += 1;
+        res
+    }
+}
+
+impl Iterator for KyberArgylePkSingleBitMutation {
     type Item = KyberArgyleInput;
 
     fn next(&mut self) -> Option<Self::Item> {

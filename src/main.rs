@@ -3,15 +3,18 @@ use std::ops::Add;
 use num_bigint::BigUint;
 use num_traits::One;
 use sha3::Digest;
-use metamorphic_testing_rs::kyber_argyle_metamorphic::{KyberArgyleCipherBitFlipMetamorphicTest, KyberArgyleCipherSingleBitMutation, KyberArgyleFakeRngMutation, KyberArgyleFakeRngMetamorphicTest, KyberArgyleInput};
+use metamorphic_testing_rs::kyber_argyle_metamorphic::{KyberArgyleCipherBitFlipMetamorphicTest, KyberArgyleCipherSingleBitMutation, KyberArgyleFakeRngMutation, KyberArgyleFakeRngMetamorphicTest, KyberArgyleInput, KyberArgylePkBitFlipMetamorphicTest, KyberArgylePkSingleBitMutation};
 use metamorphic_testing_rs::kyber_metamorphic::{KyberCipherBitFlipMetamorphicTest, KyberInput, KyberCipherSingleBitMutation, PossibleKeySize, KyberSkSingleBitMutation, KyberSkBitFlipMetamorphicTest};
 use metamorphic_testing_rs::MetamorphicTest;
 
 fn main() {
-    let res = KyberArgyleCipherBitFlipMetamorphicTest::test_all(&mut KyberArgyleCipherSingleBitMutation::new(&KyberArgyleInput::new()));
+    /*let res = KyberArgyleCipherBitFlipMetamorphicTest::test_all(&mut KyberArgyleCipherSingleBitMutation::new(&KyberArgyleInput::new()));
     println!("{}", res);
 
     let res = KyberArgyleFakeRngMetamorphicTest::test_all(&mut KyberArgyleFakeRngMutation::new(&KyberArgyleInput::new()));
+    println!("{}", res);*/
+
+    let res = KyberArgylePkBitFlipMetamorphicTest::test_all(&mut KyberArgylePkSingleBitMutation::new(&KyberArgyleInput::new()));
     println!("{}", res);
 
     /*let mut first_value = BigUint::ZERO;
