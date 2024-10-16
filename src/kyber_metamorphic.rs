@@ -1,22 +1,54 @@
-use ml_kem::{KemCore, MlKem768, MlKem768Params};
+use ml_kem::{KemCore, MlKem1024, MlKem1024Params, MlKem512, MlKem512Params, MlKem768, MlKem768Params};
 use ml_kem::array::Array;
 use ml_kem::kem::{Decapsulate, DecapsulationKey, Encapsulate};
 use crate::{MetamorphicTest, Mutation, PrimitiveInput};
+use strum::IntoEnumIterator; // 0.17.1
+use strum_macros::EnumIter;
+
+#[derive(Debug, EnumIter)]
+pub enum PossibleKeySize {
+    Key512,
+    Key768,
+    Key1024
+}
+
+#[derive(Clone, Debug)]
+enum PossibleDecapsulate {
+    K512(DecapsulationKey<MlKem512Params>),
+    K768(DecapsulationKey<MlKem768Params>),
+    K1024(DecapsulationKey<MlKem1024Params>)
+}
 
 #[derive(Clone, Debug)]
 pub struct KyberInput {
-    sk: DecapsulationKey<MlKem768Params>,
+    sk: PossibleDecapsulate,
     enc: Vec<u8>
 }
 
 impl KyberInput {
-    pub fn new() -> Self {
+    pub fn new(possible_key_size: PossibleKeySize) -> Self {
         let mut rng = rand::thread_rng();
-        let (dk, ek) = MlKem768::generate(&mut rng);
-        let (ct, _) = ek.encapsulate(&mut rng).unwrap();
+        let (dk, ct) = match possible_key_size {
+            PossibleKeySize::Key512 => {
+                let (dk, ek) = MlKem512::generate(&mut rng);
+                let (ct, _) = ek.encapsulate(&mut rng).unwrap();
+                (PossibleDecapsulate::K512(dk), ct.0.to_vec())
+            }
+            PossibleKeySize::Key768 => {
+                let (dk, ek) = MlKem768::generate(&mut rng);
+                let (ct, _) = ek.encapsulate(&mut rng).unwrap();
+                (PossibleDecapsulate::K768(dk), ct.0.to_vec())
+            }
+            PossibleKeySize::Key1024 => {
+                let (dk, ek) = MlKem1024::generate(&mut rng);
+                let (ct, _) = ek.encapsulate(&mut rng).unwrap();
+                (PossibleDecapsulate::K1024(dk), ct.0.to_vec())
+            }
+        };
+
         Self {
             sk: dk,
-            enc: ct.0.to_vec(),
+            enc: ct,
         }
     }
 }
@@ -31,7 +63,11 @@ impl MetamorphicTest for KyberBitFlipMetamorphicTest {
     type InputMutation = KyberSingleBitMutation;
 
     fn call(input: &Self::Input) -> Self::Output {
-        let k_recv = input.sk.decapsulate(&Array(input.enc.clone().try_into().unwrap())).unwrap();
+        let k_recv = match &input.sk {
+            PossibleDecapsulate::K512(sk) => sk.decapsulate(&Array(input.enc.clone().try_into().unwrap())).unwrap(),
+            PossibleDecapsulate::K768(sk) => sk.decapsulate(&Array(input.enc.clone().try_into().unwrap())).unwrap(),
+            PossibleDecapsulate::K1024(sk) => sk.decapsulate(&Array(input.enc.clone().try_into().unwrap())).unwrap()
+        };
         k_recv.to_vec()
     }
 
@@ -88,12 +124,12 @@ impl Iterator for KyberSingleBitMutation {
 }
 
 struct InterestingKyberInputIterator { // TODO different Kyber key sizes
-    key_count: usize,
+    key_size_iter: PossibleKeySizeIter,
 }
 
 impl InterestingKyberInputIterator {
     fn new() -> Self {
-        Self { key_count: 1 }
+        Self { key_size_iter: PossibleKeySize::iter() }
     }
 }
 
@@ -101,10 +137,6 @@ impl Iterator for InterestingKyberInputIterator {
     type Item = KyberInput;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.key_count == 0 {
-            return None;
-        }
-        self.key_count -= 1;
-        Some(KyberInput::new())
+        Some(KyberInput::new(self.key_size_iter.next()?))
     }
 }
