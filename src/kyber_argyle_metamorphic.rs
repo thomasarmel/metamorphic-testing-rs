@@ -31,6 +31,19 @@ impl PrimitiveInput for KyberArgyleInput {}
 
 pub struct KyberArgyleCipherBitFlipMetamorphicTest {}
 
+pub struct AllArgyleKyberOutput {
+    plain: [u8; 32],
+    pk: [u8; KYBER_PUBLICKEYBYTES],
+    sk: [u8; KYBER_SECRETKEYBYTES],
+    cipher: [u8; KYBER_CIPHERTEXTBYTES]
+}
+
+impl PartialEq for AllArgyleKyberOutput {
+    fn eq(&self, other: &Self) -> bool {
+        self.plain == other.plain || self.pk == other.pk || self.sk == other.sk || self.cipher == other.cipher
+    }
+}
+
 impl MetamorphicTest for KyberArgyleCipherBitFlipMetamorphicTest {
     type Input = KyberArgyleInput;
     type Output = [u8; 32];
@@ -49,11 +62,16 @@ pub struct KyberArgyleFakeRngMetamorphicTest {}
 
 impl MetamorphicTest for KyberArgyleFakeRngMetamorphicTest {
     type Input = KyberArgyleInput;
-    type Output = [u8; 32];
-    type InputMutation = KyberArgyleFakeRngBitMutation;
+    type Output = AllArgyleKyberOutput;
+    type InputMutation = KyberArgyleFakeRngMutation;
 
     fn call(input: &Self::Input) -> Self::Output {
-        decapsulate(&input.cipher, &input.sk).unwrap()
+        AllArgyleKyberOutput {
+            plain: decapsulate(&input.cipher, &input.sk).unwrap(),
+            pk: input.pk,
+            sk: input.sk,
+            cipher: input.cipher,
+        }
     }
 
     fn get_interesting_input_iterator() -> Box<dyn Iterator<Item=Self::Input>> {
@@ -106,12 +124,12 @@ impl Iterator for KyberArgyleCipherSingleBitMutation {
     }
 }
 
-pub struct KyberArgyleFakeRngBitMutation {
+pub struct KyberArgyleFakeRngMutation {
     original_input: KyberArgyleInput,
     index: usize
 }
 
-impl Mutation<KyberArgyleInput> for KyberArgyleFakeRngBitMutation {
+impl Mutation<KyberArgyleInput> for KyberArgyleFakeRngMutation {
     const OUTPUT_SHOULD_BE_EQ: bool = false;
 
     fn clone_with_new_original_input(&self, new_original_input: &KyberArgyleInput) -> Self {
@@ -122,7 +140,7 @@ impl Mutation<KyberArgyleInput> for KyberArgyleFakeRngBitMutation {
     }
 }
 
-impl KyberArgyleFakeRngBitMutation {
+impl KyberArgyleFakeRngMutation {
     pub fn new(original_input: &KyberArgyleInput) -> Self {
         Self {
             original_input: original_input.clone(),
@@ -149,7 +167,7 @@ impl KyberArgyleFakeRngBitMutation {
     }
 }
 
-impl Iterator for KyberArgyleFakeRngBitMutation {
+impl Iterator for KyberArgyleFakeRngMutation {
     type Item = KyberArgyleInput;
 
     fn next(&mut self) -> Option<Self::Item> {
