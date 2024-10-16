@@ -55,12 +55,12 @@ impl KyberInput {
 
 impl PrimitiveInput for KyberInput {}
 
-pub struct KyberBitFlipMetamorphicTest {}
+pub struct KyberCipherBitFlipMetamorphicTest {}
 
-impl MetamorphicTest for KyberBitFlipMetamorphicTest {
+impl MetamorphicTest for KyberCipherBitFlipMetamorphicTest {
     type Input = KyberInput;
     type Output = Vec<u8>;
-    type InputMutation = KyberSingleBitMutation;
+    type InputMutation = KyberCipherSingleBitMutation;
 
     fn call(input: &Self::Input) -> Self::Output {
         let k_recv = match &input.sk {
@@ -76,12 +76,33 @@ impl MetamorphicTest for KyberBitFlipMetamorphicTest {
     }
 }
 
-pub struct KyberSingleBitMutation {
+pub struct KyberSkBitFlipMetamorphicTest {}
+
+impl MetamorphicTest for KyberSkBitFlipMetamorphicTest {
+    type Input = KyberInput;
+    type Output = Vec<u8>;
+    type InputMutation = KyberSkSingleBitMutation;
+
+    fn call(input: &Self::Input) -> Self::Output {
+        let k_recv = match &input.sk {
+            PossibleDecapsulate::K512(sk) => sk.decapsulate(&Array(input.enc.clone().try_into().unwrap())).unwrap(),
+            PossibleDecapsulate::K768(sk) => sk.decapsulate(&Array(input.enc.clone().try_into().unwrap())).unwrap(),
+            PossibleDecapsulate::K1024(sk) => sk.decapsulate(&Array(input.enc.clone().try_into().unwrap())).unwrap()
+        };
+        k_recv.to_vec()
+    }
+
+    fn get_interesting_input_iterator() -> Box<dyn Iterator<Item=Self::Input>> {
+        Box::new(InterestingKyberInputIterator::new())
+    }
+}
+
+pub struct KyberCipherSingleBitMutation {
     bit_to_mutate_index: usize,
     original_input: KyberInput,
 }
 
-impl Mutation<KyberInput> for KyberSingleBitMutation {
+impl Mutation<KyberInput> for KyberCipherSingleBitMutation {
     const OUTPUT_SHOULD_BE_EQ: bool = false;
 
     fn clone_with_new_original_input(&self, new_original_input: &KyberInput) -> Self {
@@ -92,7 +113,7 @@ impl Mutation<KyberInput> for KyberSingleBitMutation {
     }
 }
 
-impl KyberSingleBitMutation {
+impl KyberCipherSingleBitMutation {
     pub fn new(original_input: &KyberInput) -> Self {
         Self {
             bit_to_mutate_index: 0,
@@ -110,10 +131,9 @@ impl KyberSingleBitMutation {
         output.enc[unsigned_pos] ^= 1 << bit_pos;
         Some(output)
     }
-
 }
 
-impl Iterator for KyberSingleBitMutation {
+impl Iterator for KyberCipherSingleBitMutation {
     type Item = KyberInput;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -123,7 +143,100 @@ impl Iterator for KyberSingleBitMutation {
     }
 }
 
-struct InterestingKyberInputIterator { // TODO different Kyber key sizes
+pub struct KyberSkSingleBitMutation {
+    bit_to_mutate_index: usize,
+    original_input: KyberInput,
+}
+
+impl Mutation<KyberInput> for KyberSkSingleBitMutation {
+    const OUTPUT_SHOULD_BE_EQ: bool = false;
+
+    fn clone_with_new_original_input(&self, new_original_input: &KyberInput) -> Self {
+        Self {
+            bit_to_mutate_index: 0,
+            original_input: new_original_input.clone(),
+        }
+    }
+}
+
+impl KyberSkSingleBitMutation {
+    pub fn new(original_input: &KyberInput) -> Self {
+        Self {
+            bit_to_mutate_index: 0,
+            original_input: original_input.clone(),
+        }
+    }
+
+    fn mutate_input(&self, input: &KyberInput) -> Option<KyberInput> {
+        let bit_count: usize = match &self.original_input.sk {
+            PossibleDecapsulate::K512(sk) => {
+                sk.dk_pke.s_hat.0.iter().map(|poly| {
+                    poly.0.len()
+                }).sum::<usize>()
+            }
+            PossibleDecapsulate::K768(sk) => {
+                sk.dk_pke.s_hat.0.iter().map(|poly| {
+                    poly.0.len()
+                }).sum()
+            }
+            PossibleDecapsulate::K1024(sk) => {
+                sk.dk_pke.s_hat.0.iter().map(|poly| {
+                    poly.0.len()
+                }).sum()
+            }
+        } * 16;
+        if self.bit_to_mutate_index >= bit_count {
+            return None;
+        }
+        match &self.original_input.sk {
+            PossibleDecapsulate::K512(sk) => {
+                let mut new_sk = sk.clone();
+                let in_len = new_sk.dk_pke.s_hat.0[0].0.len();
+                let out_pos = (self.bit_to_mutate_index / 16) / in_len;
+                let in_pos = (self.bit_to_mutate_index / 16) % in_len;
+                new_sk.dk_pke.s_hat.0[out_pos].0[in_pos].0 ^= 1 << (self.bit_to_mutate_index % 16);
+                Some(KyberInput {
+                    sk: PossibleDecapsulate::K512(new_sk),
+                    enc: input.enc.clone(),
+                })
+            }
+            PossibleDecapsulate::K768(sk) => {
+                let mut new_sk = sk.clone();
+                let in_len = new_sk.dk_pke.s_hat.0[0].0.len();
+                let out_pos = (self.bit_to_mutate_index / 16) / in_len;
+                let in_pos = (self.bit_to_mutate_index / 16) % in_len;
+                new_sk.dk_pke.s_hat.0[out_pos].0[in_pos].0 ^= 1 << (self.bit_to_mutate_index % 16);
+                Some(KyberInput {
+                    sk: PossibleDecapsulate::K768(new_sk),
+                    enc: input.enc.clone(),
+                })
+            }
+            PossibleDecapsulate::K1024(sk) => {
+                let mut new_sk = sk.clone();
+                let in_len = new_sk.dk_pke.s_hat.0[0].0.len();
+                let out_pos = (self.bit_to_mutate_index / 16) / in_len;
+                let in_pos = (self.bit_to_mutate_index / 16) % in_len;
+                new_sk.dk_pke.s_hat.0[out_pos].0[in_pos].0 ^= 1 << (self.bit_to_mutate_index % 16);
+                Some(KyberInput {
+                    sk: PossibleDecapsulate::K1024(new_sk),
+                    enc: input.enc.clone(),
+                })
+            }
+        }
+    }
+}
+impl Iterator for KyberSkSingleBitMutation {
+    type Item = KyberInput;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let res = self.mutate_input(&self.original_input);
+        self.bit_to_mutate_index += 1;
+        res
+    }
+}
+
+
+struct InterestingKyberInputIterator {
     key_size_iter: PossibleKeySizeIter,
 }
 
