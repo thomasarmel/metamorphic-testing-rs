@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 pub mod hash_metamorphic;
 pub mod kyber_metamorphic;
+pub mod kyber_argyle_metamorphic;
 
 pub trait MetamorphicTest {
     type Input: PrimitiveInput;
