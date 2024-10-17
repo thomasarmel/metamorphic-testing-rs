@@ -1,32 +1,30 @@
 use std::io::Write;
 use std::ops::Add;
+use fake_crypto_rng::FakeCryptoRng;
 use num_bigint::BigUint;
-use num_traits::One;
+use num_traits::{Num, One, Zero};
+use pbkdf2::{pbkdf2_hmac, pbkdf2_hmac_array};
+use pqc_kyber::{decapsulate, encapsulate, keypair};
+use sha2::{Sha256, Sha512};
+use rayon::iter::{ParallelBridge, ParallelIterator};
+use sha1::Sha1;
 use sha3::Digest;
 use metamorphic_testing_rs::kyber_argyle_metamorphic::{KyberArgyleCipherBitFlipMetamorphicTest, KyberArgyleCipherSingleBitMutation, KyberArgyleFakeRngMutation, KyberArgyleFakeRngMetamorphicTest, KyberArgyleInput, KyberArgylePkBitFlipMetamorphicTest, KyberArgylePkSingleBitMutation, KyberArgyleSkSingleBitMutation, KyberArgyleSkBitFlipMetamorphicTest};
 use metamorphic_testing_rs::kyber_metamorphic::{KyberCipherBitFlipMetamorphicTest, KyberInput, KyberCipherSingleBitMutation, PossibleKeySize, KyberSkSingleBitMutation, KyberSkBitFlipMetamorphicTest};
 use metamorphic_testing_rs::MetamorphicTest;
 
 fn main() {
-    /*let res = KyberArgyleCipherBitFlipMetamorphicTest::test_all(&mut KyberArgyleCipherSingleBitMutation::new(&KyberArgyleInput::new()));
-    println!("{}", res);
+    let password = b"password";
+    // number of iterations
+    let n = 60;
+    // Expected value of generated key
+    let mut salt = BigUint::zero();
 
-    let res = KyberArgyleFakeRngMetamorphicTest::test_all(&mut KyberArgyleFakeRngMutation::new(&KyberArgyleInput::new()));
-    println!("{}", res);
-
-    let res = KyberArgylePkBitFlipMetamorphicTest::test_all(&mut KyberArgylePkSingleBitMutation::new(&KyberArgyleInput::new()));
-    println!("{}", res);*/
-
-    let res = KyberArgyleSkBitFlipMetamorphicTest::test_all(&mut KyberArgyleSkSingleBitMutation::new(&KyberArgyleInput::new()));
-    println!("{}", res);
-
-    /*let mut first_value = BigUint::ZERO;
-    loop {
-        let mut hasher = sha3::Sha3_256::new();
-        hasher.update(first_value.to_bytes_be());
-        let hash_result = hasher.finalize().to_vec();
-        std::io::stdout().write(&hash_result).unwrap();
-        std::io::stdout().flush().unwrap();
-        first_value = first_value.add(&BigUint::one());
-    }*/
+    num_iter::range_inclusive(BigUint::zero(), BigUint::from_str_radix("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16).unwrap())
+        .into_iter().par_bridge()
+        .for_each(|salt| {
+            let key = pbkdf2_hmac_array::<Sha1, 20>(password, &salt.to_bytes_le(), n);
+            std::io::stdout().write(&key);
+            std::io::stdout().flush();
+        });
 }

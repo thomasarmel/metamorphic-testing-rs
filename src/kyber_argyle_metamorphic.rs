@@ -97,7 +97,7 @@ impl MetamorphicTest for KyberArgyleSkBitFlipMetamorphicTest {
 
     fn call(input: &Self::Input) -> Self::Output {
         //if 2130435834 != crc32fast::hash(&decapsulate(&input.cipher, &input.sk).unwrap()) {
-            println!("{} -> {} ({})", crc32fast::hash(&input.sk), crc32fast::hash(&decapsulate(&input.cipher, &input.sk).unwrap()), crc32fast::hash(&input.cipher));
+        println!("{} -> {} ({})", crc32fast::hash(&input.sk), crc32fast::hash(&decapsulate(&input.cipher, &input.sk).unwrap()), crc32fast::hash(&input.cipher));
         //}
         //println!("{:?}", decapsulate(&input.cipher, &input.sk).unwrap());
         decapsulate(&input.cipher, &input.sk).unwrap()
