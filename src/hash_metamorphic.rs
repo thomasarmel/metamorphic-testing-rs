@@ -1,4 +1,5 @@
 use crate::HashMetamorphic;
+use blake2::{Blake2b512, Blake2s256};
 use rand;
 use rand::RngCore;
 use sha2::{Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256};
@@ -66,6 +67,8 @@ macro_rules! impl_hash_metamorphic {
     };
 }
 
+impl_hash_metamorphic! {Blake2b512, Blake2b512Metamorphic, "Blake2b512"}
+impl_hash_metamorphic! {Blake2s256, Blake2s256Metamorphic, "Blake2s256"}
 impl_hash_metamorphic! {Sha224, Sha2_224Metamorphic, "Sha2_224"}
 impl_hash_metamorphic! {Sha256, Sha2_256Metamorphic, "Sha2_256"}
 impl_hash_metamorphic! {Sha384, Sha2_384Metamorphic, "Sha2_384"}
