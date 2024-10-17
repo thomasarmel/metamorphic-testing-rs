@@ -8,6 +8,7 @@ use groestl::{Groestl224, Groestl256, Groestl384, Groestl512};
 use jh::{Jh224, Jh256, Jh384, Jh512};
 use rand;
 use rand::RngCore;
+use ring::digest::Context;
 use ripemd::{Ripemd128, Ripemd160, Ripemd256, Ripemd320};
 use sha2::{Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256};
 use sha3::{Digest, Sha3_224, Sha3_256, Sha3_384, Sha3_512};
@@ -179,3 +180,70 @@ impl HashMetamorphic for Blake3Metamorphic {
         (state, second_part.to_vec())
     }
 }
+
+macro_rules! impl_hash_metamorphic_ring {
+    ($hash_type:expr, $test_struct_name:ident, $libname:literal) => {
+        pub struct $test_struct_name {}
+        impl HashMetamorphic for $test_struct_name {
+            type Input = Vec<u8>;
+            type Output = Vec<u8>;
+            type State = Context;
+
+            const LIBNAME: &str = $libname;
+
+            fn gen_input(size: usize) -> Self::Input {
+                let mut data = vec![0u8; size];
+                rand::thread_rng().fill_bytes(&mut data);
+                data
+            }
+
+            fn input_as_u8(input: &Self::Input) -> Vec<u8> {
+                input.to_owned()
+            }
+
+            fn output_as_u8(output: &Self::Output) -> Vec<u8> {
+                output.to_owned()
+            }
+
+            fn compare_output(initial_output: &Self::Output, output: &Self::Output) -> bool {
+                initial_output == output
+            }
+
+            fn hash(state: Self::State, input: &Self::Input) -> Self::Output {
+                let mut hasher = state;
+
+                hasher.update(input);
+
+                hasher.finish().as_ref().to_vec()
+            }
+
+            fn initial_state() -> Self::State {
+                Self::State::new(&$hash_type)
+            }
+
+            fn u8_as_input(
+                intial_state: &Self::State,
+                _initial_input: &Self::Input,
+                mutated: Vec<u8>,
+            ) -> (Self::State, Self::Input) {
+                (intial_state.clone(), mutated)
+            }
+
+            fn hash_update(
+                initial_state: &Self::State,
+                _initial_input: &Self::Input,
+                first_part: &[u8],
+                second_part: &[u8],
+            ) -> (Self::State, Self::Input) {
+                let mut state = initial_state.clone();
+                state.update(first_part);
+                (state, second_part.to_vec())
+            }
+        }
+    };
+}
+
+impl_hash_metamorphic_ring! {ring::digest::SHA256, RingSHA256Metamorphic, "Ring SHA256"}
+impl_hash_metamorphic_ring! {ring::digest::SHA384, RingSHA384Metamorphic, "Ring SHA384"}
+impl_hash_metamorphic_ring! {ring::digest::SHA512, RingSHA512Metamorphic, "Ring SHA512"}
+impl_hash_metamorphic_ring! {ring::digest::SHA512_256, RingSHA512_256Metamorphic, "Ring SHA512_256"}
