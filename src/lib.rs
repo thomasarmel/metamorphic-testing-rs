@@ -75,13 +75,14 @@ impl<
 
     pub fn run_test<T: Mutator<Input, State> + Send + Sync>(
         &self,
+        min_size: usize,
         max_size: usize,
         test_name: &str,
         lib_name: &str,
         mutator: T,
     ) {
         let shared_mutator = Arc::new(mutator.clone());
-        let number_of_errors :usize = (1..max_size)
+        let number_of_errors :usize = (min_size..max_size+1)
             .into_par_iter()
             .map(|size| {
                 let input = (self.gen_input)(size);
@@ -115,8 +116,8 @@ impl<
             }).sum();
 
         println!(
-            "[{}] !SUMMARY ! {} with 1-{} bytes : found {} errors",
-            lib_name, test_name, max_size, number_of_errors
+            "[{}] !SUMMARY ! {} with sizes [{}-{}] : found {} errors",
+            lib_name, test_name, min_size, max_size, number_of_errors
         );
     }
 }
@@ -158,7 +159,7 @@ pub trait HashMetamorphic {
             Self::hash,
             |reference_output, output| reference_output != output,
         );
-        runner.run_test(max_size, "Bit Inclusion", Self::LIBNAME, mutator);
+        runner.run_test(1, max_size, "Bit Inclusion", Self::LIBNAME, mutator);
     }
 
     fn update_hash_test(max_size: usize) {
@@ -170,7 +171,7 @@ pub trait HashMetamorphic {
             |reference_output, output| reference_output == output,
         );
 
-        runner.run_test(max_size, "Update Hash", Self::LIBNAME, mutator);
+        runner.run_test(1, max_size, "Update Hash", Self::LIBNAME, mutator);
     }
 
     fn run_tests(max_size: usize) {
@@ -179,18 +180,32 @@ pub trait HashMetamorphic {
     }
 }
 
-pub trait KEMMetamorphic {
-    type Input;
-    type Output;
-    type State;
+// pub trait KEMMetamorphic {
+//     type Input: std::fmt::Debug + Clone + Send;
+//     type Output: std::fmt::Debug + Clone + Send + PartialEq;
+//     type State: Clone + Send;
 
-    fn gen_input(msg_size: usize) -> Self::Input;
-    fn get_key_from_input_as_u8(input: Self::Input) -> Vec<u8>;
-    fn get_msg_from_input_as_u8(input: Self::Input) -> Vec<u8>;
-    fn set_key_from_input_as_u8(input: Self::Input, key: Vec<u8>) -> Self::Input;
-    fn set_msg_from_input_as_u8(input: Self::Input, msg: Vec<u8>) -> Self::Input;
-    fn output_as_u8(output: Self::Output) -> Vec<u8>;
-}
+//     const LIBNAME: &str;
+
+//     fn gen_input(msg_size: usize) -> Self::Input;
+//     fn gen_state() -> Self::State;
+//     fn get_key_from_input_as_u8(input: Self::Input) -> Vec<u8>;
+//     fn get_msg_from_input_as_u8(input: Self::Input) -> Vec<u8>;
+//     fn set_key_from_input_as_u8(input: Self::Input, key: Vec<u8>) -> Self::Input;
+//     fn set_msg_from_input_as_u8(input: Self::Input, msg: Vec<u8>) -> Self::Input;
+//     fn output_as_u8(output: Self::Output) -> Vec<u8>;
+
+//     fn bit_inclusion_test(max_size: usize) {
+//         let mutator = BitInclusionMutator::new(Self::get, Self::u8_as_input);
+//         let runner = MetamorphicTestRunner::new(
+//             Self::gen_input,
+//             Self::initial_state,
+//             Self::hash,
+//             |reference_output, output| reference_output != output,
+//         );
+//         runner.run_test(max_size, max_size, "Bit Inclusion", Self::LIBNAME, mutator);
+//     }
+// }
 
 pub trait Mutator<I: Clone, S: Clone>: Clone {
     fn mutate_input(&self, input: &I, initial_state: &S, element_to_mutate: usize) -> (S, I);
