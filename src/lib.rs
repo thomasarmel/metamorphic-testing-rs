@@ -79,7 +79,7 @@ impl<
         test_name: &str,
         lib_name: &str,
         mutator: T,
-    )  {
+    ) {
         let shared_mutator = Arc::new(mutator.clone());
         let number_of_errors :usize = (1..max_size)
             .into_par_iter()
@@ -107,7 +107,6 @@ impl<
                                 "[{}] ! ERROR ! Running {} on size {} : reference input {:?}, reference output {:?}, input {:?}, output {:?}",
                                 lib_name, test_name, size, input, ref_output, e.0, e.1
                             );
-                            
                         }
                         err.len()
                     },
@@ -115,11 +114,10 @@ impl<
                 }
             }).sum();
 
-                println!(
-                    "[{}] !SUMMARY ! {} with 1-{} bytes : found {} errors",
-                    lib_name, test_name, max_size, number_of_errors
-                );
-        
+        println!(
+            "[{}] !SUMMARY ! {} with 1-{} bytes : found {} errors",
+            lib_name, test_name, max_size, number_of_errors
+        );
     }
 }
 
