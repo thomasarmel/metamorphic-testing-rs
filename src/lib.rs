@@ -1,4 +1,5 @@
 pub mod hash_metamorphic;
+pub mod kem_metamorphic;
 
 use std::{ops::Deref, sync::Arc};
 
@@ -43,7 +44,7 @@ impl<
         mutator: &T,
         max_input_size: usize,
         collect_outputs: bool,
-    ) -> (Option<Vec<(Input, Output)>>, Option<Vec<Output>>) {
+    ) -> (Option<Vec<(Input, Output, usize)>>, Option<Vec<Output>>) {
         let mut collected_outputs = vec![];
         let mut collected_errors = vec![];
         for size in 1..max_input_size {
@@ -54,7 +55,7 @@ impl<
                 collected_outputs.push(new_output.clone());
             }
             if !(self.check)(&new_output, reference_output) {
-                collected_errors.push((mutated_input, new_output));
+                collected_errors.push((mutated_input, new_output, size));
             }
         }
 
@@ -105,8 +106,8 @@ impl<
                     Some(err) =>  {
                         for e in &err {
                             println!(
-                                "[{}] ! ERROR ! Running {} on size {} : reference input {:?}, reference output {:?}, input {:?}, output {:?}",
-                                lib_name, test_name, size, input, ref_output, e.0, e.1
+                                "[{}] ! ERROR ! Running {} on size {} (impacted bit: {}): reference input {:?}, reference output {:?}, input {:?}, output {:?}",
+                                lib_name, test_name, size, e.2, input, ref_output, e.0, e.1
                             );
                         }
                         err.len()
@@ -180,32 +181,94 @@ pub trait HashMetamorphic {
     }
 }
 
-// pub trait KEMMetamorphic {
-//     type Input: std::fmt::Debug + Clone + Send;
-//     type Output: std::fmt::Debug + Clone + Send + PartialEq;
-//     type State: Clone + Send;
+pub trait KEMMetamorphic {
+    type SecretKey: std::fmt::Debug + Clone + Send;
+    type PublicKey: std::fmt::Debug + Clone + Send;
+    type CipherText: std::fmt::Debug + Clone + Send;
+    type SharedSecret: std::fmt::Debug + Clone + Send + PartialEq;
+    type State: Clone + Send;
 
-//     const LIBNAME: &str;
+    const LIBNAME: &str;
+    const PKSIZE: usize;
+    const SKSIZE: usize;
+    const CTSIZE: usize;
+    const SSSIZE: usize;
 
-//     fn gen_input(msg_size: usize) -> Self::Input;
-//     fn gen_state() -> Self::State;
-//     fn get_key_from_input_as_u8(input: Self::Input) -> Vec<u8>;
-//     fn get_msg_from_input_as_u8(input: Self::Input) -> Vec<u8>;
-//     fn set_key_from_input_as_u8(input: Self::Input, key: Vec<u8>) -> Self::Input;
-//     fn set_msg_from_input_as_u8(input: Self::Input, msg: Vec<u8>) -> Self::Input;
-//     fn output_as_u8(output: Self::Output) -> Vec<u8>;
+    fn gen_keys() -> (Self::SecretKey, Self::PublicKey);
 
-//     fn bit_inclusion_test(max_size: usize) {
-//         let mutator = BitInclusionMutator::new(Self::get, Self::u8_as_input);
-//         let runner = MetamorphicTestRunner::new(
-//             Self::gen_input,
-//             Self::initial_state,
-//             Self::hash,
-//             |reference_output, output| reference_output != output,
-//         );
-//         runner.run_test(max_size, max_size, "Bit Inclusion", Self::LIBNAME, mutator);
-//     }
-// }
+    fn decaps(sk: &Self::SecretKey, ct: &Self::CipherText) -> Self::SharedSecret;
+    fn encaps(pk: &Self::PublicKey) -> (Self::SharedSecret, Self::CipherText);
+
+    fn gen_input_sk_test(_msg_size: usize) -> (Self::SecretKey, Self::PublicKey, Self::CipherText) {
+        let (sk, pk) = Self::gen_keys();
+        let res = Self::encaps(&pk);
+        (sk, pk, res.1)
+    }
+
+    fn gen_input_pk_test(_msg_size: usize) -> (Self::SecretKey, Self::PublicKey) {
+        Self::gen_keys()
+    }
+
+    fn gen_state() -> Self::State;
+
+    fn get_skey_from_input_as_u8(
+        input: &(Self::SecretKey, Self::PublicKey, Self::CipherText),
+    ) -> Vec<u8>;
+
+    fn get_pkey_from_input_as_u8(
+        input: &(Self::SecretKey, Self::PublicKey, Self::CipherText),
+    ) -> Vec<u8>;
+
+    fn set_skey_from_input_as_u8(
+        _state: &Self::State,
+        input: &(Self::SecretKey, Self::PublicKey, Self::CipherText),
+        key: Vec<u8>,
+    ) -> (
+        Self::State,
+        (Self::SecretKey, Self::PublicKey, Self::CipherText),
+    );
+
+    fn set_pkey_from_input_as_u8(
+        _state: &Self::State,
+        input: &(Self::SecretKey, Self::PublicKey, Self::CipherText),
+        key: Vec<u8>,
+    ) -> (
+        Self::State,
+        (Self::SecretKey, Self::PublicKey, Self::CipherText),
+    );
+    fn output_as_u8(output: Self::SharedSecret) -> Vec<u8>;
+
+    fn call_test_sk(
+        _state: Self::State,
+        input: &(Self::SecretKey, Self::PublicKey, Self::CipherText),
+    ) -> Self::SharedSecret {
+        Self::decaps(&input.0, &input.2)
+    }
+
+    fn bit_inclusion_on_skey_test() {
+        let mutator = BitInclusionMutator::new(
+            Self::get_skey_from_input_as_u8,
+            Self::set_skey_from_input_as_u8,
+        );
+        let runner = MetamorphicTestRunner::new(
+            Self::gen_input_sk_test,
+            Self::gen_state,
+            Self::call_test_sk,
+            |reference_output, output| reference_output != output,
+        );
+        runner.run_test(
+            Self::SKSIZE * 8,
+            Self::SKSIZE * 8,
+            "Bit Inclusion on secret key",
+            Self::LIBNAME,
+            mutator,
+        );
+    }
+
+    fn run_tests() {
+        Self::bit_inclusion_on_skey_test();
+    }
+}
 
 pub trait Mutator<I: Clone, S: Clone>: Clone {
     fn mutate_input(&self, input: &I, initial_state: &S, element_to_mutate: usize) -> (S, I);
